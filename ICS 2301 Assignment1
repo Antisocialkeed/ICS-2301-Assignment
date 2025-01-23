@@ -1,0 +1,127 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct Node {
+    char character;
+    int frequency;
+    struct Node *left, *right;
+} Node;
+
+Node* createNode(char character, int frequency) {
+    Node* node = (Node*)malloc(sizeof(Node));
+    node->character = character;
+    node->frequency = frequency;
+    node->left = node->right = NULL;
+    return node;
+}
+
+void insertNode(Node** queue, Node* node, int* size) {
+    int i = (*size)++;
+    while (i && queue[(i - 1) / 2]->frequency > node->frequency) {
+        queue[i] = queue[(i - 1) / 2];
+        i = (i - 1) / 2;
+    }
+    queue[i] = node;
+}
+
+Node* removeMin(Node** queue, int* size) {
+    Node* root = queue[0];
+    Node* lastNode = queue[--(*size)];
+    int i = 0, child;
+    while ((child = 2 * i + 1) < *size) {
+        if (child + 1 < *size && queue[child]->frequency > queue[child + 1]->frequency)
+            child++;
+        if (lastNode->frequency <= queue[child]->frequency)
+            break;
+        queue[i] = queue[child];
+        i = child;
+    }
+    queue[i] = lastNode;
+    return root;
+}
+
+Node* buildHuffmanTree(char characters[], int frequencies[], int size) {
+    Node* queue[256];
+    int queueSize = 0;
+    int i;
+    for (i = 0; i < size; i++)
+        insertNode(queue, createNode(characters[i], frequencies[i]), &queueSize);
+    while (queueSize > 1) {
+        Node* left = removeMin(queue, &queueSize);
+        Node* right = removeMin(queue, &queueSize);
+        Node* merged = createNode('\0', left->frequency + right->frequency);
+        merged->left = left;
+        merged->right = right;
+        insertNode(queue, merged, &queueSize);
+    }
+    return queue[0];
+}
+
+void generateCodes(Node* root, char* code, int depth, char codes[][256]) {
+    if (!root->left && !root->right) {
+        code[depth] = '\0';
+        strcpy(codes[(unsigned char)root->character], code);
+        return;
+    }
+    if (root->left) {
+        code[depth] = '0';
+        generateCodes(root->left, code, depth + 1, codes);
+    }
+    if (root->right) {
+        code[depth] = '1';
+        generateCodes(root->right, code, depth + 1, codes);
+    }
+}
+
+void compressText(char* text, char codes[][256], char* compressedText, int* compressedSize) {
+    int i = 0;
+	for (i = 0; text[i]; i++) {
+        strcat(compressedText, codes[(unsigned char)text[i]]);
+        *compressedSize += strlen(codes[(unsigned char)text[i]]);
+    }
+}
+
+void freeTree(Node* root) {
+    if (!root) return;
+    freeTree(root->left);
+    freeTree(root->right);
+    free(root);
+}
+
+int main() {
+    char text[1024];
+    printf("Enter text to compress: ");
+    fgets(text, sizeof(text), stdin);
+    size_t len = strlen(text);
+    if (text[len - 1] == '\n') {
+        text[len - 1] = '\0';
+    }
+    int frequencies[256] = {0};
+    int i;
+    for (i = 0; text[i]; i++) {
+        frequencies[(unsigned char)text[i]]++;
+    }
+    char characters[256];
+    int freqList[256];
+    int uniqueCharCount = 0;
+    int i;
+    for (i = 0; i < 256; i++) {
+        if (frequencies[i] > 0) {
+            characters[uniqueCharCount] = i;
+            freqList[uniqueCharCount] = frequencies[i];
+            uniqueCharCount++;
+        }
+    }
+    Node* root = buildHuffmanTree(characters, freqList, uniqueCharCount);
+    char codes[256][256] = {{0}};
+    char currentCode[256] = {0};
+    generateCodes(root, currentCode, 0, codes);
+    char compressedText[1024] = {0};
+    int compressedSize = 0;
+    compressText(text, codes, compressedText, &compressedSize);
+    printf("Original size: %ld bytes\n", strlen(text));
+    printf("Compressed size: %d bytes\n", (compressedSize + 7) / 8);
+    freeTree(root);
+    return 0;
+}
